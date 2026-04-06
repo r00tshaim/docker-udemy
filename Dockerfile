@@ -1,21 +1,25 @@
-# Step 1: Use a lightweight Python image (much smaller than Ubuntu)
-FROM python:3.11-slim
+# -------- Stage 1: Install dependencies --------
+FROM python:3.11-slim AS base
 
-# Step 2: Set working directory inside container
-WORKDIR /app
+FROM base AS builder
 
-# Step 3: Copy only requirements first (better caching)
+WORKDIR /home/app
+
 COPY requirements.txt .
-
-# Step 4: Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Step 5: Copy application code
-COPY app/ ./app/
+# -------- Stage 2: Final image --------
+FROM base AS final
 
-# -P flag maps the container ports mentioned in EXPOSE to random ports on the host machine.
-#without -P flag, this EXPOSE insturction does not make any sense
+WORKDIR /home/app
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy app code
+COPY app/ .
+
 EXPOSE 8000
 
-# Step 6: Run the FastAPI app using uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
