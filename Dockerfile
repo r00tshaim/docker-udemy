@@ -1,26 +1,17 @@
-#Docker configuration file
+# Step 1: Use a lightweight Python image (much smaller than Ubuntu)
+FROM python:3.11-slim
 
-#Step1: Use base image
-FROM ubuntu
-
-#Step2: Get PIP in base image
-RUN apt-get update
-RUN apt-get install -y curl
-
-#Step3: Install UV
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-ENV PATH="/root/.local/bin:${PATH}"
-
-#Step4: Copy Project files to container
-COPY app/__init__.py /app/__init__.py
-COPY app/main.py /app/main.py
-COPY requirements.txt /app/requirements.txt
-
-#Step5: Install dependencies
+# Step 2: Set working directory inside container
 WORKDIR /app
-RUN uv venv
-RUN uv pip install -r requirements.txt
 
-#Step6: Run the application
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0"]
+# Step 3: Copy only requirements first (better caching)
+COPY requirements.txt .
+
+# Step 4: Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Step 5: Copy application code
+COPY app/ ./app/
+
+# Step 6: Run the FastAPI app using uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
