@@ -13,5 +13,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Step 5: Copy application code
 COPY app/ ./app/
 
+# -P flag maps the container ports mentioned in EXPOSE to random ports on the host machine.
+#without -P flag, this EXPOSE insturction does not make any sense
+EXPOSE 8000
+
 # Step 6: Run the FastAPI app using uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
