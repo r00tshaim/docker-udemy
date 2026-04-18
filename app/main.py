@@ -1,9 +1,55 @@
+import logging
+from contextlib import asynccontextmanager
 from typing import Dict, Optional
 
+import asyncpg
+import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI(title="Simple Dictionary CRUD API")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+redis_client: redis.Redis = None
+pg_pool: asyncpg.pool.Pool = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global redis_client, pg_pool
+    logger.info("Connecting to Redis...")
+    redis_client = redis.from_url("redis://redis:6379/0") # Use localhost for local dev, or 'redis' for docker-compose
+    try:
+        await redis_client.ping()
+        logger.info("CONNECTED to Redis!")
+    except redis.asyncio.ConnectionError as e:
+        logger.error(f"ERROR connecting to Redis: {e}")
+        redis_client = None
+
+    logger.info("Connecting to PostgreSQL...")
+    try:
+        pg_pool = await asyncpg.create_pool("postgresql://postgres:postgres@db:5432/postgres")
+        async with pg_pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        logger.info("CONNECTED to PostgreSQL!")
+    except Exception as e:
+        logger.error(f"ERROR connecting to PostgreSQL: {e}")
+        pg_pool = None
+
+    yield
+
+    logger.info("Disconnecting from Redis...")
+    if redis_client:
+        await redis_client.close()
+        logger.info("Disconnected from Redis.")
+
+    logger.info("Disconnecting from PostgreSQL...")
+    if pg_pool:
+        await pg_pool.close()
+        logger.info("Disconnected from PostgreSQL.")
+
+
+app = FastAPI(title="Simple Dictionary CRUD API", lifespan=lifespan)
 
 class Item(BaseModel):
     name: str
